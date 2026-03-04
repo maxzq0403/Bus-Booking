@@ -20,7 +20,7 @@
     <div class="bus-grid" id="busMap"></div>
 
     <script>
-        // ใส่ URL ที่ได้จาก Google Apps Script (อันเดิมของคุณใช้ได้เลย)
+        // ใส่ URL ที่ได้จาก Google Apps Script 
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzpj8COqgeuBGFVA3Dq3LGXyIlNpTZaOQoo2vVKVWx2SNZ3tvFzNFj869wWhGCsAzdU3Q/exec"; 
         let seatsData = {};
 
@@ -40,29 +40,31 @@
             document.getElementById('loader').style.display = 'none';
         }
 
-        async function reserve(num) {
-            const seatKey = num.toString();
-            if (seatsData[seatKey]) {
-                alert("ที่นั่งเลข " + num + " จองโดยคุณ " + seatsData[seatKey] + " แล้วครับ");
-                return;
-            }
-            const name = prompt("คุณกำลังจองที่นั่งหมายเลข " + num + "\nกรุณากรอกชื่อของคุณ:");
-            if (!name || name.trim() === "") return;
+  async function reserve(num) {
+    if (seatsData[num.toString()]) {
+        alert("จองแล้วโดยคุณ " + seatsData[num.toString()]);
+        return;
+    }
+    const name = prompt("ชื่อของคุณสำหรับที่นั่งเลข " + num + ":");
+    if (!name || name.trim() === "") return;
 
-            document.getElementById('loader').style.display = 'flex';
-            
-            // ส่งข้อมูลแบบ Parameter (เข้า doPost ของ Google ง่ายกว่า)
-            const url = SCRIPT_URL + "?seat=" + encodeURIComponent(num) + "&name=" + encodeURIComponent(name.trim());
+    document.getElementById('loader').style.display = 'flex';
+    
+    // ส่งข้อมูลแบบ GET ไปที่ doGet โดยตรงเพื่อความชัวร์
+    const finalUrl = `${SCRIPT_URL}?seat=${num}&name=${encodeURIComponent(name.trim())}`;
 
-            try {
-                await fetch(url, { method: 'POST', mode: 'no-cors' });
-                alert("บันทึกการจองที่นั่งหมายเลข " + num + " สำเร็จ!");
-                setTimeout(loadData, 2000); // รีโหลดข้อมูลหลังผ่านไป 2 วินาที
-            } catch (e) {
-                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
-                document.getElementById('loader').style.display = 'none';
-            }
-        }
+    try {
+        // ใช้โหมด no-cors เพื่อให้คำขอผ่านไปได้
+        await fetch(finalUrl, { method: 'GET', mode: 'no-cors' });
+        
+        alert("กดจองสำเร็จ! (หากชื่อไม่ขึ้นทันที ให้รอ 2-3 วินาทีแล้วรีเฟรช)");
+        setTimeout(loadData, 2000);
+    } catch (e) {
+        alert("การเชื่อมต่อมีปัญหา");
+        document.getElementById('loader').style.display = 'none';
+    }
+}
+
 
         function render() {
             const map = document.getElementById('busMap');
