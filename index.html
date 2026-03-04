@@ -8,20 +8,20 @@
         body { font-family: 'Tahoma', sans-serif; background: #f4f7f6; text-align: center; padding: 20px; }
         .header { background: #2c3e50; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
         .bus-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 400px; margin: 0 auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .seat { padding: 15px 5px; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; transition: 0.3s; min-height: 50px; display: flex; flex-direction: column; justify-content: center; }
+        .seat { padding: 15px 5px; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; transition: 0.3s; min-height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
         .available { background: #2ecc71; border: 2px solid #27ae60; }
         .booked { background: #e74c3c; border: 2px solid #c0392b; cursor: not-allowed; }
-        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: none; align-items: center; justify-content: center; z-index: 100; flex-direction: column; }
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: none; align-items: center; justify-content: center; z-index: 100; flex-direction: column; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="loader" class="loading-overlay"><div>กำลังโหลดข้อมูล...</div></div>
-    <div class="header"><h1>🚌 ระบบจองที่นั่งรถบัส</h1></div>
+    <div id="loader" class="loading-overlay">กำลังอัปเดตข้อมูลที่นั่ง...</div>
+    <div class="header"><h1>🚌 จองที่นั่งรถบัส</h1></div>
     <div class="bus-grid" id="busMap"></div>
 
     <script>
-        // ใส่ URL เดิมของคุณ (ห้ามลบ /exec)
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzJLBSnL8a_xVDk4F639jVgjiegECn_vEomPGVrgJuNhoy6Zv_qSeIMTxqdQP5ksaxoIg/exec"; 
+        // ใส่ URL ที่ได้จาก Google Apps Script (อันเดิมของคุณใช้ได้เลย)
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzpj8COqgeuBGFVA3Dq3LGXyIlNpTZaOQoo2vVKVWx2SNZ3tvFzNFj869wWhGCsAzdU3Q/exec"; 
         let seatsData = {};
 
         async function loadData() {
@@ -31,40 +31,35 @@
                 const data = await res.json();
                 seatsData = {};
                 if (data && data.length > 1) {
-                    data.slice(1).forEach(row => { if(row[0]) seatsData[row[0].toString()] = row[1]; });
+                    data.slice(1).forEach(row => { 
+                        if(row[0]) seatsData[row[0].toString()] = row[1]; 
+                    });
                 }
-                console.log("Data loaded:", seatsData);
             } catch (e) { console.error("Error:", e); }
             render();
             document.getElementById('loader').style.display = 'none';
         }
 
         async function reserve(num) {
-            if (seatsData[num.toString()]) {
-                alert("ที่นั่งนี้มีคนจองแล้วครับ");
+            const seatKey = num.toString();
+            if (seatsData[seatKey]) {
+                alert("ที่นั่งเลข " + num + " จองโดยคุณ " + seatsData[seatKey] + " แล้วครับ");
                 return;
             }
-            const name = prompt("กรุณากรอกชื่อเพื่อจองที่นั่งหมายเลข " + num);
+            const name = prompt("คุณกำลังจองที่นั่งหมายเลข " + num + "\nกรุณากรอกชื่อของคุณ:");
             if (!name || name.trim() === "") return;
 
             document.getElementById('loader').style.display = 'flex';
             
-            // ใช้การส่งแบบ URLSearchParams เพื่อให้ Google Script รับข้อมูลง่ายขึ้น
-            const formData = new URLSearchParams();
-            formData.append('seat', num);
-            formData.append('name', name.trim());
+            // ส่งข้อมูลแบบ Parameter (เข้า doPost ของ Google ง่ายกว่า)
+            const url = SCRIPT_URL + "?seat=" + encodeURIComponent(num) + "&name=" + encodeURIComponent(name.trim());
 
             try {
-                await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: formData
-                });
-                
-                alert("ส่งคำขอจองแล้ว! กรุณารอ 2 วินาทีแล้วหน้าจอจะอัปเดต");
-                setTimeout(loadData, 2000);
+                await fetch(url, { method: 'POST', mode: 'no-cors' });
+                alert("บันทึกการจองที่นั่งหมายเลข " + num + " สำเร็จ!");
+                setTimeout(loadData, 2000); // รีโหลดข้อมูลหลังผ่านไป 2 วินาที
             } catch (e) {
-                alert("เกิดข้อผิดพลาด");
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
                 document.getElementById('loader').style.display = 'none';
             }
         }
@@ -76,11 +71,12 @@
                 const div = document.createElement('div');
                 const occupant = seatsData[i.toString()];
                 div.className = `seat ${occupant ? 'booked' : 'available'}`;
-                div.innerHTML = `<b>${i}</b><small>${occupant ? occupant : 'ว่าง'}</small>`;
+                div.innerHTML = `<b>${i}</b><small style="font-size:10px;">${occupant ? occupant : 'ว่าง'}</small>`;
                 div.onclick = () => reserve(i);
                 map.appendChild(div);
             }
         }
+
         loadData();
     </script>
 </body>
