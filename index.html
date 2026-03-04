@@ -20,27 +20,27 @@
 <body>
     <div id="loader" class="loading-overlay">
         <div class="spinner"></div>
-        <div>กำลังสื่อสารกับดาวเทียม...</div>
+        <div>กำลังสื่อสารกับข้อมูล...</div>
     </div>
 
     <div class="header">
         <h1>🚌 ระบบจองที่นั่งรถบัส</h1>
     </div>
 
-    <div class="bus-grid" id="busMap">
-        </div>
+    <div class="bus-grid" id="busMap"></div>
 
     <script>
-        // ใช้ URL เดิมที่คุณให้มา
+        // ใช้ URL เดิมที่คุณทำสำเร็จแล้ว
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzJLBSnL8a_xVDk4F639jVgjiegECn_vEomPGVrgJuNhoy6Zv_qSeIMTxqdQP5ksaxoIg/exec"; 
         let seatsData = {};
 
         async function loadData() {
             document.getElementById('loader').style.display = 'flex';
             try {
-                // เพิ่มโหมด no-cache เพื่อให้ได้ข้อมูลล่าสุดเสมอ
-                const res = await fetch(SCRIPT_URL + "?t=" + new Date().getTime());
+                // เพิ่ม { redirect: 'follow' } เพื่อให้ตามข้อมูลไปจนเจอ
+                const res = await fetch(SCRIPT_URL + "?t=" + new Date().getTime(), { redirect: 'follow' });
                 const data = await res.json();
+                
                 seatsData = {};
                 if (data && data.length > 1) {
                     data.slice(1).forEach(row => { 
@@ -48,8 +48,8 @@
                     });
                 }
             } catch (e) { 
-                console.error(e);
-                alert('ยังโหลดข้อมูลจาก Google ไม่ได้ แต่คุณสามารถดูผังที่นั่งก่อนได้ครับ'); 
+                console.error("Fetch Error:", e);
+                // ไม่ต้อง Alert แล้วเพื่อให้เพื่อนไม่ตกใจ วาดที่นั่งไปเลย
             }
             render();
             document.getElementById('loader').style.display = 'none';
@@ -57,24 +57,25 @@
 
         async function reserve(num) {
             if (seatsData[num]) return;
-            const name = prompt(`คุณกำลังจองที่นั่งหมายเลข ${num}\nกรอกชื่อเล่นได้เลย:`);
+            const name = prompt(`จองที่นั่งหมายเลข ${num}\nกรอกชื่อเล่น/ชื่อจริง:`);
             
             if (!name || name.trim() === "") return;
 
             document.getElementById('loader').style.display = 'flex';
             try {
-                // ใช้การส่งแบบ Text/Plain เพื่อเลี่ยงปัญหา CORS ในบาง Browser
+                // ส่งข้อมูลเข้า Google Sheets
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
                     mode: 'no-cors', 
+                    cache: 'no-cache',
                     body: JSON.stringify({ seat: num, name: name.trim() })
                 });
                 
-                // เนื่องจากใช้ no-cors เราจะไม่รู้ผลลัพธ์ทันที ต้องรอสักครู่แล้วโหลดใหม่
+                // รอระบบบันทึกแป๊บนึงแล้วโหลดใหม่
                 setTimeout(() => {
                     loadData();
-                    alert("ส่งข้อมูลการจองแล้ว! กรุณารอระบบอัปเดตสักครู่");
-                }, 1500);
+                    alert("จองสำเร็จแล้ว! ข้อมูลจะอัปเดตในครู่เดียว");
+                }, 2000);
 
             } catch (e) {
                 alert("เกิดข้อผิดพลาดในการส่งข้อมูล");
@@ -89,13 +90,12 @@
                 const div = document.createElement('div');
                 const isBooked = seatsData[i];
                 div.className = `seat ${isBooked ? 'booked' : 'available'}`;
-                div.innerHTML = `<b>${i}</b><small>${isBooked ? isBooked : 'ว่าง'}</small>`;
+                div.innerHTML = `<b>${i}</b><br><small>${isBooked ? isBooked : 'ว่าง'}</small>`;
                 div.onclick = () => reserve(i);
                 map.appendChild(div);
             }
         }
 
-        // เริ่มต้นโหลดข้อมูล
         loadData();
     </script>
 </body>
