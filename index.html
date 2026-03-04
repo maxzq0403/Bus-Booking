@@ -6,79 +6,65 @@
     <title>ระบบจองที่นั่งรถบัส</title>
     <style>
         body { font-family: 'Tahoma', sans-serif; background: #f4f7f6; text-align: center; padding: 20px; }
-        .header { background: #2c3e50; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background: #2c3e50; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
         .bus-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 400px; margin: 0 auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .seat { padding: 15px 5px; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; transition: 0.3s; min-height: 50px; display: flex; flex-direction: column; justify-content: center; }
         .available { background: #2ecc71; border: 2px solid #27ae60; }
-        .available:hover { background: #27ae60; transform: scale(1.05); }
-        .booked { background: #e74c3c; border: 2px solid #c0392b; cursor: not-allowed; opacity: 0.9; }
+        .booked { background: #e74c3c; border: 2px solid #c0392b; cursor: not-allowed; }
         .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: none; align-items: center; justify-content: center; z-index: 100; flex-direction: column; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite; margin-bottom: 10px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-    <div id="loader" class="loading-overlay">
-        <div class="spinner"></div>
-        <div>กำลังสื่อสารกับข้อมูล...</div>
-    </div>
-
-    <div class="header">
-        <h1>🚌 ระบบจองที่นั่งรถบัส</h1>
-    </div>
-
+    <div id="loader" class="loading-overlay"><div>กำลังโหลดข้อมูล...</div></div>
+    <div class="header"><h1>🚌 ระบบจองที่นั่งรถบัส</h1></div>
     <div class="bus-grid" id="busMap"></div>
 
     <script>
-        // ใช้ URL เดิมที่คุณทำสำเร็จแล้ว
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzpj8COqgeuBGFVA3Dq3LGXyIlNpTZaOQoo2vVKVWx2SNZ3tvFzNFj869wWhGCsAzdU3Q/exec";
+        // ใส่ URL เดิมของคุณ (ห้ามลบ /exec)
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzJLBSnL8a_xVDk4F639jVgjiegECn_vEomPGVrgJuNhoy6Zv_qSeIMTxqdQP5ksaxoIg/exec"; 
         let seatsData = {};
 
         async function loadData() {
             document.getElementById('loader').style.display = 'flex';
             try {
-                // เพิ่ม { redirect: 'follow' } เพื่อให้ตามข้อมูลไปจนเจอ
                 const res = await fetch(SCRIPT_URL + "?t=" + new Date().getTime(), { redirect: 'follow' });
                 const data = await res.json();
-                
                 seatsData = {};
                 if (data && data.length > 1) {
-                    data.slice(1).forEach(row => { 
-                        if(row[0]) seatsData[row[0]] = row[1]; 
-                    });
+                    data.slice(1).forEach(row => { if(row[0]) seatsData[row[0].toString()] = row[1]; });
                 }
-            } catch (e) { 
-                console.error("Fetch Error:", e);
-                // ไม่ต้อง Alert แล้วเพื่อให้เพื่อนไม่ตกใจ วาดที่นั่งไปเลย
-            }
+                console.log("Data loaded:", seatsData);
+            } catch (e) { console.error("Error:", e); }
             render();
             document.getElementById('loader').style.display = 'none';
         }
 
         async function reserve(num) {
-            if (seatsData[num]) return;
-            const name = prompt(`จองที่นั่งหมายเลข ${num}\nกรอกชื่อเล่น/ชื่อจริง:`);
-            
+            if (seatsData[num.toString()]) {
+                alert("ที่นั่งนี้มีคนจองแล้วครับ");
+                return;
+            }
+            const name = prompt("กรุณากรอกชื่อเพื่อจองที่นั่งหมายเลข " + num);
             if (!name || name.trim() === "") return;
 
             document.getElementById('loader').style.display = 'flex';
+            
+            // ใช้การส่งแบบ URLSearchParams เพื่อให้ Google Script รับข้อมูลง่ายขึ้น
+            const formData = new URLSearchParams();
+            formData.append('seat', num);
+            formData.append('name', name.trim());
+
             try {
-                // ส่งข้อมูลเข้า Google Sheets
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors', 
-                    cache: 'no-cache',
-                    body: JSON.stringify({ seat: num, name: name.trim() })
+                    mode: 'no-cors',
+                    body: formData
                 });
                 
-                // รอระบบบันทึกแป๊บนึงแล้วโหลดใหม่
-                setTimeout(() => {
-                    loadData();
-                    alert("จองสำเร็จแล้ว! ข้อมูลจะอัปเดตในครู่เดียว");
-                }, 2000);
-
+                alert("ส่งคำขอจองแล้ว! กรุณารอ 2 วินาทีแล้วหน้าจอจะอัปเดต");
+                setTimeout(loadData, 2000);
             } catch (e) {
-                alert("เกิดข้อผิดพลาดในการส่งข้อมูล");
+                alert("เกิดข้อผิดพลาด");
                 document.getElementById('loader').style.display = 'none';
             }
         }
@@ -88,14 +74,13 @@
             map.innerHTML = '';
             for (let i = 1; i <= 40; i++) {
                 const div = document.createElement('div');
-                const isBooked = seatsData[i];
-                div.className = `seat ${isBooked ? 'booked' : 'available'}`;
-                div.innerHTML = `<b>${i}</b><br><small>${isBooked ? isBooked : 'ว่าง'}</small>`;
+                const occupant = seatsData[i.toString()];
+                div.className = `seat ${occupant ? 'booked' : 'available'}`;
+                div.innerHTML = `<b>${i}</b><small>${occupant ? occupant : 'ว่าง'}</small>`;
                 div.onclick = () => reserve(i);
                 map.appendChild(div);
             }
         }
-
         loadData();
     </script>
 </body>
