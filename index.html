@@ -6,51 +6,81 @@
     <title>ระบบจองที่นั่งรถบัส</title>
     <style>
         body { font-family: 'Tahoma', sans-serif; background: #f4f7f6; text-align: center; padding: 20px; }
-        .header { background: #2c3e50; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        .header { background: #2c3e50; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .bus-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 400px; margin: 0 auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .seat { padding: 15px 5px; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; transition: 0.3s; }
-        .available { background: #2ecc71; }
-        .booked { background: #e74c3c; cursor: not-allowed; }
-        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: none; align-items: center; justify-content: center; z-index: 100; }
+        .seat { padding: 15px 5px; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; transition: 0.3s; min-height: 50px; display: flex; flex-direction: column; justify-content: center; }
+        .available { background: #2ecc71; border: 2px solid #27ae60; }
+        .available:hover { background: #27ae60; transform: scale(1.05); }
+        .booked { background: #e74c3c; border: 2px solid #c0392b; cursor: not-allowed; opacity: 0.9; }
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: none; align-items: center; justify-content: center; z-index: 100; flex-direction: column; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite; margin-bottom: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-    <div id="loader" class="loading-overlay">กำลังโหลด...</div>
-    <div class="header"><h1>🚌 ระบบจองที่นั่งรถบัส</h1></div>
-    <div class="bus-grid" id="busMap"></div>
+    <div id="loader" class="loading-overlay">
+        <div class="spinner"></div>
+        <div>กำลังสื่อสารกับดาวเทียม...</div>
+    </div>
+
+    <div class="header">
+        <h1>🚌 ระบบจองที่นั่งรถบัส</h1>
+        <p>เพื่อนร่วมห้อง cba.ac.th</p>
+    </div>
+
+    <div class="bus-grid" id="busMap">
+        </div>
 
     <script>
-        const SCRIPT_URL = "https://script.google.com/a/macros/cba.ac.th/s/AKfycbw4YRpu0xVq8YWPV2QUsFCPNfXyumP_81ZXxRDJNDrd8YlAAeM2K5WjZda_GD2AOPWO/exec"; //
+        // ใช้ URL เดิมที่คุณให้มา
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw4YRpu0xVq8YWPV2QUsFCPNfXyumP_81ZXxRDJNDrd8YlAAeM2K5WjZda_GD2AOPWO/exec"; 
         let seatsData = {};
 
         async function loadData() {
             document.getElementById('loader').style.display = 'flex';
             try {
-                const res = await fetch(SCRIPT_URL);
+                // เพิ่มโหมด no-cache เพื่อให้ได้ข้อมูลล่าสุดเสมอ
+                const res = await fetch(SCRIPT_URL + "?t=" + new Date().getTime());
                 const data = await res.json();
                 seatsData = {};
-                data.slice(1).forEach(row => { seatsData[row[0]] = row[1]; });
-                render();
-            } catch (e) { alert('โหลดข้อมูลไม่สำเร็จ'); }
+                if (data && data.length > 1) {
+                    data.slice(1).forEach(row => { 
+                        if(row[0]) seatsData[row[0]] = row[1]; 
+                    });
+                }
+            } catch (e) { 
+                console.error(e);
+                alert('ยังโหลดข้อมูลจาก Google ไม่ได้ แต่คุณสามารถดูผังที่นั่งก่อนได้ครับ'); 
+            }
+            render();
             document.getElementById('loader').style.display = 'none';
         }
 
         async function reserve(num) {
             if (seatsData[num]) return;
-            const name = prompt(`จองที่นั่งหมายเลข ${num} ในชื่อ:`);
-            if (!name) return;
+            const name = prompt(`คุณกำลังจองที่นั่งหมายเลข ${num}\nกรุณากรอกชื่อ-นามสกุล:`);
+            
+            if (!name || name.trim() === "") return;
 
             document.getElementById('loader').style.display = 'flex';
-            const res = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ seat: num, name: name })
-});
-            const result = await res.text();
-            if (result === "Taken") alert("ที่นั่งนี้เพิ่งถูกจองไป!");
-            loadData();
+            try {
+                // ใช้การส่งแบบ Text/Plain เพื่อเลี่ยงปัญหา CORS ในบาง Browser
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', 
+                    body: JSON.stringify({ seat: num, name: name.trim() })
+                });
+                
+                // เนื่องจากใช้ no-cors เราจะไม่รู้ผลลัพธ์ทันที ต้องรอสักครู่แล้วโหลดใหม่
+                setTimeout(() => {
+                    loadData();
+                    alert("ส่งข้อมูลการจองแล้ว! กรุณารอระบบอัปเดตสักครู่");
+                }, 1500);
+
+            } catch (e) {
+                alert("เกิดข้อผิดพลาดในการส่งข้อมูล");
+                document.getElementById('loader').style.display = 'none';
+            }
         }
 
         function render() {
@@ -58,12 +88,15 @@
             map.innerHTML = '';
             for (let i = 1; i <= 40; i++) {
                 const div = document.createElement('div');
-                div.className = `seat ${seatsData[i] ? 'booked' : 'available'}`;
-                div.innerHTML = `<b>${i}</b><br><small>${seatsData[i] || 'ว่าง'}</small>`;
+                const isBooked = seatsData[i];
+                div.className = `seat ${isBooked ? 'booked' : 'available'}`;
+                div.innerHTML = `<b>${i}</b><small>${isBooked ? isBooked : 'ว่าง'}</small>`;
                 div.onclick = () => reserve(i);
                 map.appendChild(div);
             }
         }
+
+        // เริ่มต้นโหลดข้อมูล
         loadData();
     </script>
 </body>
