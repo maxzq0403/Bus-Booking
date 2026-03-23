@@ -5,66 +5,43 @@
 <title>ระบบจองที่นั่ง 🚌</title>
 
 <style>
-body {
-  font-family: sans-serif;
-  text-align: center;
-}
+body { font-family: sans-serif; text-align: center; }
 
-h1 {
-  background: #333;
-  color: white;
-  padding: 10px;
-}
+h1 { background: #333; color: white; padding: 10px; }
 
-/* loading */
-#loading {
-  margin-top: 30px;
-}
-
-.spinner {
-  margin: auto;
-  width: 40px;
-  height: 40px;
-  border: 5px solid #ccc;
-  border-top: 5px solid #333;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-#loading p {
-  margin-top: 10px;
-  color: #555;
-}
-
-/* grid */
 .grid {
   display: grid;
-  grid-template-columns: repeat(4, 80px);
-  gap: 10px;
+  grid-template-columns: repeat(2, 150px);
+  gap: 15px;
   justify-content: center;
   margin-top: 20px;
 }
 
 .seat {
-  padding: 20px;
+  padding: 25px;
   border-radius: 10px;
   cursor: pointer;
   color: white;
   font-weight: bold;
 }
 
-.empty {
-  background: green;
+.empty { background: green; }
+.booked { background: red; }
+
+/* popup */
+#popup {
+  position: fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background: rgba(0,0,0,0.5);
 }
 
-.booked {
-  background: red;
+.popup-box {
+  background:white;
+  padding:20px;
+  margin:100px auto;
+  width:250px;
+  border-radius:10px;
 }
 </style>
 </head>
@@ -72,80 +49,82 @@ h1 {
 <body>
 
 <h1>ระบบจองที่นั่ง 🚌</h1>
-
-<div id="loading">
-  <div class="spinner"></div>
-  <p>กำลังโหลดที่นั่ง...</p>
-</div>
-
 <div class="grid" id="grid"></div>
+
+<div id="popup" style="display:none;">
+  <div class="popup-box">
+    <h3 id="seatTitle"></h3>
+    <input id="name1" placeholder="ชื่อคุณ"><br><br>
+    <input id="name2" placeholder="ชื่อเพื่อน"><br><br>
+    <button onclick="confirmBooking()">ยืนยัน</button>
+    <button onclick="closePopup()">ยกเลิก</button>
+  </div>
+</div>
 
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbwtrngwK_TVfzdcpKLXuvD9KMgH-cOmTgF_foV5M8aGX16x5mSfgGdwTA0kT38inSV0/exec";
 
-let loading = false;
+let selectedSeat = null;
 
 async function loadSeats() {
-  if (loading) return;
-  loading = true;
+  const res = await fetch(API_URL + "?t=" + Date.now());
+  const data = await res.json();
 
-  document.getElementById("loading").style.display = "block";
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
 
-  try {
-    const res = await fetch(API_URL + "?t=" + Date.now());
-    const data = await res.json();
+  data.forEach(seat => {
+    const div = document.createElement("div");
+    div.className = "seat " + seat.status;
+    div.innerText = seat.seat;
 
-    const grid = document.getElementById("grid");
-    grid.innerHTML = "";
+    div.onclick = () => {
+      if (seat.status === "booked") {
+        alert("จองแล้ว:\n" + seat.name1 + " + " + seat.name2);
+        return;
+      }
 
-    data.forEach(seat => {
-      const div = document.createElement("div");
-      div.className = "seat " + seat.status;
-      div.innerText = seat.seat;
+      selectedSeat = seat.seat;
+      document.getElementById("seatTitle").innerText = "จองที่นั่ง " + seat.seat;
+      document.getElementById("popup").style.display = "block";
+    };
 
-      div.onclick = async () => {
-        if (seat.status === "booked") {
-          alert("ที่นั่งนี้ถูกจองโดย: " + seat.name);
-          return;
-        }
-
-        const name = prompt("กรอกชื่อ:");
-        if (!name) return;
-
-        const res = await fetch(API_URL, {
-          method: "POST",
-          body: JSON.stringify({
-            seat: seat.seat,
-            name: name
-          })
-        });
-
-        const result = await res.json();
-
-        if (result.success) {
-          alert("จองสำเร็จ!");
-          loadSeats();
-        } else {
-          alert("จองไม่สำเร็จ มีคนจองไปแล้ว");
-          loadSeats();
-        }
-      };
-
-      grid.appendChild(div);
-    });
-
-  } catch (err) {
-    console.log(err);
-  }
-
-  document.getElementById("loading").style.display = "none";
-  loading = false;
+    grid.appendChild(div);
+  });
 }
 
-// โหลดครั้งแรก
-loadSeats();
+function closePopup() {
+  document.getElementById("popup").style.display = "none";
+}
 
-// รีเฟรชทุก 1 วินาที
+async function confirmBooking() {
+  const name1 = document.getElementById("name1").value;
+  const name2 = document.getElementById("name2").value;
+
+  if (!name1 || !name2) return;
+
+  const res = await fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      seat: selectedSeat,
+      name1: name1,
+      name2: name2
+    })
+  });
+
+  const result = await res.json();
+
+  if (result.success) {
+    alert("จองสำเร็จ!");
+  } else {
+    alert("มีคนจองไปแล้ว");
+  }
+
+  closePopup();
+  loadSeats();
+}
+
+loadSeats();
 setInterval(loadSeats, 1000);
 </script>
 
