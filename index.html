@@ -2,19 +2,54 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ระบบจองที่นั่ง 🚌</title>
 
 <style>
-body { font-family: sans-serif; text-align: center; }
+body {
+  font-family: sans-serif;
+  text-align: center;
+  margin: 0;
+}
 
-h1 { background: #333; color: white; padding: 10px; }
+h1 {
+  background: #333;
+  color: white;
+  padding: 15px;
+  margin: 0;
+}
 
+/* loading */
+#loading {
+  margin-top: 30px;
+}
+
+.spinner {
+  margin: auto;
+  width: 40px;
+  height: 40px;
+  border: 5px solid #ccc;
+  border-top: 5px solid #333;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
+/* grid */
 .grid {
   display: grid;
-  grid-template-columns: repeat(2, 150px);
-  gap: 15px;
+  grid-template-columns: 150px 100px 150px;
+  gap: 20px;
   justify-content: center;
   margin-top: 20px;
+}
+
+.aisle {
+  background: #eee;
+  border-radius: 5px;
 }
 
 .seat {
@@ -40,8 +75,32 @@ h1 { background: #333; color: white; padding: 10px; }
   background:white;
   padding:20px;
   margin:100px auto;
-  width:250px;
+  width:260px;
   border-radius:10px;
+}
+
+.popup-box input {
+  width: 90%;
+  padding: 8px;
+}
+
+.popup-box button {
+  margin: 5px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+/* loading ตอนจอง */
+#bookingLoading {
+  display: none;
+  margin-top: 10px;
+}
+
+/* 📱 มือถือ */
+@media (max-width: 600px) {
+  .grid { grid-template-columns: 1fr; }
+  .aisle { display: none; }
+  .seat { font-size: 18px; padding: 30px; }
 }
 </style>
 </head>
@@ -49,48 +108,93 @@ h1 { background: #333; color: white; padding: 10px; }
 <body>
 
 <h1>ระบบจองที่นั่ง 🚌</h1>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>กำลังโหลดที่นั่ง...</p>
+</div>
+
 <div class="grid" id="grid"></div>
 
+<!-- popup -->
 <div id="popup" style="display:none;">
   <div class="popup-box">
     <h3 id="seatTitle"></h3>
+
     <input id="name1" placeholder="ชื่อคุณ"><br><br>
     <input id="name2" placeholder="ชื่อเพื่อน"><br><br>
-    <button onclick="confirmBooking()">ยืนยัน</button>
+
+    <button id="confirmBtn" onclick="confirmBooking()">ยืนยัน</button>
     <button onclick="closePopup()">ยกเลิก</button>
+
+    <div id="bookingLoading">
+      <div class="spinner"></div>
+      <p>กำลังจอง...</p>
+    </div>
   </div>
 </div>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbxYz9HpIQx-kgKxkzGlM_LFXna5ZkEVqMNsV6qwUFqWmQTqx3rWFpK2sMOZtnv3CUaB1A/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwtrngwK_TVfzdcpKLXuvD9KMgH-cOmTgF_foV5M8aGX16x5mSfgGdwTA0kT38inSV0/exec";
 
 let selectedSeat = null;
+let firstLoad = true;
 
 async function loadSeats() {
+  if (firstLoad) {
+    document.getElementById("loading").style.display = "block";
+  }
+
   const res = await fetch(API_URL + "?t=" + Date.now());
   const data = await res.json();
 
   const grid = document.getElementById("grid");
   grid.innerHTML = "";
 
-  data.forEach(seat => {
-    const div = document.createElement("div");
-    div.className = "seat " + seat.status;
-    div.innerText = seat.seat;
+  for (let i = 0; i < data.length; i += 2) {
+    const left = data[i];
+    const right = data[i + 1];
 
-    div.onclick = () => {
-      if (seat.status === "booked") {
-        alert("จองแล้ว:\n" + seat.name1 + " + " + seat.name2);
-        return;
-      }
+    grid.appendChild(createSeat(left));
 
-      selectedSeat = seat.seat;
-      document.getElementById("seatTitle").innerText = "จองที่นั่ง " + seat.seat;
-      document.getElementById("popup").style.display = "block";
-    };
+    const aisle = document.createElement("div");
+    aisle.className = "aisle";
+    grid.appendChild(aisle);
 
-    grid.appendChild(div);
-  });
+    if (right) {
+      grid.appendChild(createSeat(right));
+    }
+  }
+
+  if (firstLoad) {
+    document.getElementById("loading").style.display = "none";
+    firstLoad = false;
+  }
+}
+
+function createSeat(seat) {
+  const div = document.createElement("div");
+  div.className = "seat " + seat.status;
+  div.innerText = seat.seat;
+
+  div.onclick = () => {
+    if (seat.status === "booked") {
+      alert("จองแล้ว:\n" + seat.name1 + " + " + seat.name2);
+      return;
+    }
+
+    selectedSeat = seat.seat;
+
+    document.getElementById("seatTitle").innerText = "จองที่นั่ง " + seat.seat;
+
+    // 🔥 รีเซ็ต input ทุกครั้ง
+    document.getElementById("name1").value = "";
+    document.getElementById("name2").value = "";
+
+    document.getElementById("popup").style.display = "block";
+  };
+
+  return div;
 }
 
 function closePopup() {
@@ -102,6 +206,10 @@ async function confirmBooking() {
   const name2 = document.getElementById("name2").value;
 
   if (!name1 || !name2) return;
+
+  // 🔥 เปิด loading
+  document.getElementById("bookingLoading").style.display = "block";
+  document.getElementById("confirmBtn").disabled = true;
 
   const res = await fetch(API_URL, {
     method: "POST",
@@ -120,10 +228,15 @@ async function confirmBooking() {
     alert("มีคนจองไปแล้ว");
   }
 
+  // 🔥 ปิด loading
+  document.getElementById("bookingLoading").style.display = "none";
+  document.getElementById("confirmBtn").disabled = false;
+
   closePopup();
   loadSeats();
 }
 
+// start
 loadSeats();
 setInterval(loadSeats, 1000);
 </script>
