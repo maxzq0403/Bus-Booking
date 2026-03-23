@@ -1,85 +1,100 @@
 <!DOCTYPE html>
-<html lang="th">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบจองที่นั่งรถบัส</title>
-    <style>
-        body { font-family: 'Tahoma', sans-serif; background: #f4f7f6; text-align: center; padding: 20px; }
-        .header { background: #2c3e50; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-        .bus-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 400px; margin: 0 auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .seat { padding: 15px 5px; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; transition: 0.3s; min-height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
-        .available { background: #2ecc71; border: 2px solid #27ae60; }
-        .booked { background: #e74c3c; border: 2px solid #c0392b; cursor: not-allowed; }
-        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: none; align-items: center; justify-content: center; z-index: 100; flex-direction: column; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div id="loader" class="loading-overlay">กำลังอัปเดตข้อมูลที่นั่ง...</div>
-    <div class="header"><h1>🚌 จองที่นั่งรถบัส</h1></div>
-    <div class="bus-grid" id="busMap"></div>
-
-    <script>
-        // ใส่ URL ที่ได้จาก Google Apps Script 
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzpj8COqgeuBGFVA3Dq3LGXyIlNpTZaOQoo2vVKVWx2SNZ3tvFzNFj869wWhGCsAzdU3Q/exec"; 
-        let seatsData = {};
-
-        async function loadData() {
-            document.getElementById('loader').style.display = 'flex';
-            try {
-                const res = await fetch(SCRIPT_URL + "?t=" + new Date().getTime(), { redirect: 'follow' });
-                const data = await res.json();
-                seatsData = {};
-                if (data && data.length > 1) {
-                    data.slice(1).forEach(row => { 
-                        if(row[0]) seatsData[row[0].toString()] = row[1]; 
-                    });
-                }
-            } catch (e) { console.error("Error:", e); }
-            render();
-            document.getElementById('loader').style.display = 'none';
-        }
-
-  async function reserve(num) {
-    if (seatsData[num.toString()]) {
-        alert("จองแล้วโดยคุณ " + seatsData[num.toString()]);
-        return;
-    }
-    const name = prompt("ชื่อของคุณสำหรับที่นั่งเลข " + num + ":");
-    if (!name || name.trim() === "") return;
-
-    document.getElementById('loader').style.display = 'flex';
-    
-    // ส่งข้อมูลแบบ GET ไปที่ doGet โดยตรงเพื่อความชัวร์
-    const finalUrl = `${SCRIPT_URL}?seat=${num}&name=${encodeURIComponent(name.trim())}`;
-
-    try {
-        // ใช้โหมด no-cors เพื่อให้คำขอผ่านไปได้
-        await fetch(finalUrl, { method: 'GET', mode: 'no-cors' });
-        
-        alert("กดจองสำเร็จ! (หากชื่อไม่ขึ้นทันที ให้รอ 2-3 วินาทีแล้วรีเฟรช)");
-        setTimeout(loadData, 2000);
-    } catch (e) {
-        alert("การเชื่อมต่อมีปัญหา");
-        document.getElementById('loader').style.display = 'none';
-    }
+<meta charset="UTF-8">
+<title>ระบบจองที่นั่ง 🚌</title>
+<style>
+body {
+  font-family: sans-serif;
+  text-align: center;
 }
 
+h1 {
+  background: #333;
+  color: white;
+  padding: 10px;
+}
 
-        function render() {
-            const map = document.getElementById('busMap');
-            map.innerHTML = '';
-            for (let i = 1; i <= 40; i++) {
-                const div = document.createElement('div');
-                const occupant = seatsData[i.toString()];
-                div.className = `seat ${occupant ? 'booked' : 'available'}`;
-                div.innerHTML = `<b>${i}</b><small style="font-size:10px;">${occupant ? occupant : 'ว่าง'}</small>`;
-                div.onclick = () => reserve(i);
-                map.appendChild(div);
-            }
-        }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 80px);
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
 
-        loadData();
-    </script>
+.seat {
+  padding: 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: white;
+}
+
+.empty {
+  background: green;
+}
+
+.booked {
+  background: red;
+}
+</style>
+</head>
+<body>
+
+<h1>ระบบจองที่นั่ง 🚌</h1>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbwtrngwK_TVfzdcpKLXuvD9KMgH-cOmTgF_foV5M8aGX16x5mSfgGdwTA0kT38inSV0/exec";
+
+async function loadSeats() {
+  const res = await fetch(API_URL);
+  const data = await res.json();
+
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+
+  data.forEach(seat => {
+    const div = document.createElement("div");
+    div.className = "seat " + seat.status;
+    div.innerText = seat.seat;
+
+    div.onclick = async () => {
+      if (seat.status === "booked") {
+        alert("ที่นั่งนี้ถูกจองโดย: " + seat.name);
+        return;
+      }
+
+      const name = prompt("กรอกชื่อ:");
+      if (!name) return;
+
+      const res = await fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          seat: seat.seat,
+          name: name
+        })
+      });
+
+      const result = await res.json();
+
+      if (result.success) {
+        alert("จองสำเร็จ!");
+        loadSeats();
+      } else {
+        alert("จองไม่สำเร็จ มีคนจองไปแล้ว");
+        loadSeats();
+      }
+    };
+
+    grid.appendChild(div);
+  });
+}
+
+loadSeats();
+setInterval(loadSeats, 3000);
+</script>
+
 </body>
 </html>
