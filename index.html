@@ -98,9 +98,18 @@ h1 {
 
 /* 📱 มือถือ */
 @media (max-width: 600px) {
-  .grid { grid-template-columns: 1fr; }
-  .aisle { display: none; }
-  .seat { font-size: 18px; padding: 30px; }
+  .grid {
+    grid-template-columns: 1fr 40px 1fr;
+  }
+
+  .seat {
+    font-size: 16px;
+    padding: 20px;
+  }
+
+  .aisle {
+    display: block;
+  }
 }
 </style>
 </head>
